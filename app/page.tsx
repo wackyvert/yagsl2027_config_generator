@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Upload, Download, Settings } from "lucide-react"
+import { Upload, Download, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 import { GyroConfig } from "@/components/gyro-config"
 import { ModuleConfig } from "@/components/module-config"
 import { PhysicalProperties } from "@/components/physical-properties"
@@ -17,6 +17,8 @@ import type { ConfigData } from "@/lib/types"
 
 export default function Home() {
   const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState("gyro")
+
   const [config, setConfig] = useState<ConfigData>({
     swervedrive: {
       gyro: {
@@ -81,6 +83,23 @@ export default function Home() {
       angle: { p: 0.01, i: 0, d: 0 },
     },
   })
+
+  const tabs = ["gyro", "frontleft", "frontright", "backleft", "backright", "properties"]
+  const currentTabIndex = tabs.indexOf(activeTab)
+  const isFirstTab = currentTabIndex === 0
+  const isLastTab = currentTabIndex === tabs.length - 1
+
+  const handleNext = () => {
+    if (!isLastTab) {
+      setActiveTab(tabs[currentTabIndex + 1])
+    }
+  }
+
+  const handleBack = () => {
+    if (!isFirstTab) {
+      setActiveTab(tabs[currentTabIndex - 1])
+    }
+  }
 
   const handleDownload = async () => {
     try {
@@ -150,7 +169,7 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-8">
         <Card className="p-6">
-          <Tabs defaultValue="gyro" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-6 mb-6">
               <TabsTrigger value="gyro">Gyro</TabsTrigger>
               <TabsTrigger value="frontleft">Front Left</TabsTrigger>
@@ -231,6 +250,18 @@ export default function Home() {
                 />
               </div>
             </TabsContent>
+
+            <div className="flex justify-between items-center mt-6 pt-6 border-t border-border">
+              <Button variant="outline" onClick={handleBack} disabled={isFirstTab}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+
+              <Button onClick={handleNext} disabled={isLastTab}>
+                Next
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </Tabs>
         </Card>
       </main>

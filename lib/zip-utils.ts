@@ -1,26 +1,88 @@
 import JSZip from "jszip"
 import FileSaver from "file-saver"
-import type { ConfigData } from "./types"
+import type { ConfigData, ModuleConfigData } from "./types"
+
+export const SCHEMA_BASE_URL = "https://example.com/schemas"
+
+function cleanModuleForExport(module: ModuleConfigData): any {
+  const isAttached = module.absoluteEncoder.type.endsWith("_attached")
+  const usesChannel = module.absoluteEncoder.type.endsWith("_dio") || module.absoluteEncoder.type.endsWith("_analog")
+
+  // Remove useCosineCompensator from export
+  const { useCosineCompensator, ...moduleWithoutCosine } = module
+
+  if (isAttached) {
+    // For attached encoders, set all encoder fields to defaults
+    return {
+      ...moduleWithoutCosine,
+      absoluteEncoder: {
+        ...module.absoluteEncoder,
+        id: 0,
+        channel: 0,
+        canbus: "",
+      },
+    }
+  } else if (usesChannel) {
+    // For DIO/Analog encoders, set CAN ID to 0 and CAN Bus to empty string
+    return {
+      ...moduleWithoutCosine,
+      absoluteEncoder: {
+        ...module.absoluteEncoder,
+        id: 0,
+        canbus: "",
+      },
+    }
+  }
+
+  return moduleWithoutCosine
+}
 
 export async function generateZip(config: ConfigData) {
   const zip = new JSZip()
 
-  // Add swervedrive.json
-  zip.file("swervedrive.json", JSON.stringify(config.swervedrive, null, 2))
+  const swervedriveWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/swervedrive.json`,
+    ...config.swervedrive,
+  }
+  zip.file("swervedrive.json", JSON.stringify(swervedriveWithSchema, null, 2))
 
   // Add modules folder
   const modulesFolder = zip.folder("modules")
   if (!modulesFolder) throw new Error("Failed to create modules folder")
 
-  // Add module files
-  modulesFolder.file("frontleft.json", JSON.stringify(config.modules.frontleft, null, 2))
-  modulesFolder.file("frontright.json", JSON.stringify(config.modules.frontright, null, 2))
-  modulesFolder.file("backleft.json", JSON.stringify(config.modules.backleft, null, 2))
-  modulesFolder.file("backright.json", JSON.stringify(config.modules.backright, null, 2))
+  const frontleftWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/module.json`,
+    ...cleanModuleForExport(config.modules.frontleft),
+  }
+  const frontrightWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/module.json`,
+    ...cleanModuleForExport(config.modules.frontright),
+  }
+  const backleftWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/module.json`,
+    ...cleanModuleForExport(config.modules.backleft),
+  }
+  const backrightWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/module.json`,
+    ...cleanModuleForExport(config.modules.backright),
+  }
 
-  // Add property files
-  modulesFolder.file("physicalproperties.json", JSON.stringify(config.physicalproperties, null, 2))
-  modulesFolder.file("pidfproperties.json", JSON.stringify(config.pidfproperties, null, 2))
+  modulesFolder.file("frontleft.json", JSON.stringify(frontleftWithSchema, null, 2))
+  modulesFolder.file("frontright.json", JSON.stringify(frontrightWithSchema, null, 2))
+  modulesFolder.file("backleft.json", JSON.stringify(backleftWithSchema, null, 2))
+  modulesFolder.file("backright.json", JSON.stringify(backrightWithSchema, null, 2))
+
+  const physicalpropertiesWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/physicalproperties.json`,
+    ...config.physicalproperties,
+  }
+  const pidfpropertiesWithSchema = {
+    $schema: `${SCHEMA_BASE_URL}/pidfproperties.json`,
+    ...config.pidfproperties,
+  }
+
+  modulesFolder.file("physicalproperties.json", JSON.stringify(physicalpropertiesWithSchema, null, 2))
+  modulesFolder.file("pidfproperties.json", JSON.stringify(pidfpropertiesWithSchema, null, 2))
 
   // Generate and download zip
   const blob = await zip.generateAsync({ type: "blob" })

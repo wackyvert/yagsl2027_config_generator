@@ -38,7 +38,6 @@ export interface ModuleConfigData {
     front: number
     left: number
   }
-  useCosineCompensator?: boolean
   gearing?: {
     drive: {
       gearRatio: number

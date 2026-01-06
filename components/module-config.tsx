@@ -58,6 +58,10 @@ const ENCODER_TYPES = [
 ]
 
 export function ModuleConfig({ moduleName, config, onChange }: ModuleConfigProps) {
+  const isAttached = config.absoluteEncoder.type.endsWith("_attached")
+  const usesChannel = config.absoluteEncoder.type.endsWith("_dio") || config.absoluteEncoder.type.endsWith("_analog")
+  const showEncoderFields = !isAttached
+
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">{moduleName} Module</h3>
@@ -210,56 +214,62 @@ export function ModuleConfig({ moduleName, config, onChange }: ModuleConfigProps
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>CAN ID</Label>
-            <Input
-              type="number"
-              value={config.absoluteEncoder.id}
-              onChange={(e) =>
-                onChange({
-                  ...config,
-                  absoluteEncoder: {
-                    ...config.absoluteEncoder,
-                    id: Number(e.target.value),
-                  },
-                })
-              }
-            />
-          </div>
+          {showEncoderFields && !usesChannel && (
+            <div className="space-y-2">
+              <Label>CAN ID</Label>
+              <Input
+                type="number"
+                value={config.absoluteEncoder.id}
+                onChange={(e) =>
+                  onChange({
+                    ...config,
+                    absoluteEncoder: {
+                      ...config.absoluteEncoder,
+                      id: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label>Channel</Label>
-            <Input
-              type="number"
-              value={config.absoluteEncoder.channel}
-              onChange={(e) =>
-                onChange({
-                  ...config,
-                  absoluteEncoder: {
-                    ...config.absoluteEncoder,
-                    channel: Number(e.target.value),
-                  },
-                })
-              }
-            />
-          </div>
+          {showEncoderFields && usesChannel && (
+            <div className="space-y-2">
+              <Label>Channel</Label>
+              <Input
+                type="number"
+                value={config.absoluteEncoder.channel}
+                onChange={(e) =>
+                  onChange({
+                    ...config,
+                    absoluteEncoder: {
+                      ...config.absoluteEncoder,
+                      channel: Number(e.target.value),
+                    },
+                  })
+                }
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label>CAN Bus</Label>
-            <Input
-              value={config.absoluteEncoder.canbus}
-              placeholder="Default"
-              onChange={(e) =>
-                onChange({
-                  ...config,
-                  absoluteEncoder: {
-                    ...config.absoluteEncoder,
-                    canbus: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
+          {showEncoderFields && !usesChannel && (
+            <div className="space-y-2">
+              <Label>CAN Bus</Label>
+              <Input
+                value={config.absoluteEncoder.canbus}
+                placeholder="Default"
+                onChange={(e) =>
+                  onChange({
+                    ...config,
+                    absoluteEncoder: {
+                      ...config.absoluteEncoder,
+                      canbus: e.target.value,
+                    },
+                  })
+                }
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 mt-4">
@@ -331,7 +341,7 @@ export function ModuleConfig({ moduleName, config, onChange }: ModuleConfigProps
       {/* Location */}
       <div>
         <h4 className="text-sm font-medium mb-3 text-muted-foreground">Module Location (inches)</h4>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Front</Label>
             <Input
@@ -358,19 +368,6 @@ export function ModuleConfig({ moduleName, config, onChange }: ModuleConfigProps
                 })
               }
             />
-          </div>
-
-          <div className="flex items-center space-x-2 pt-8">
-            <Checkbox
-              checked={config.useCosineCompensator ?? true}
-              onCheckedChange={(checked) =>
-                onChange({
-                  ...config,
-                  useCosineCompensator: checked as boolean,
-                })
-              }
-            />
-            <Label className="cursor-pointer">Cosine Compensator</Label>
           </div>
         </div>
       </div>
