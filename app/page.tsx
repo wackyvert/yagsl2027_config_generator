@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Upload, Download, ChevronLeft, ChevronRight, BookOpen, MessageCircle } from "lucide-react"
+import { SwerveVisualizer } from "@/components/swerve-visualizer"
+import { analyzeSwerve } from "@/lib/swerve-analysis"
 import { GyroConfig } from "@/components/gyro-config"
 import { ModuleConfig } from "@/components/module-config"
 import { PhysicalProperties } from "@/components/physical-properties"
@@ -88,7 +90,7 @@ export default function Home() {
     },
   })
 
-  const tabs = ["gyro", "frontleft", "frontright", "backleft", "backright", "properties"]
+  const tabs = ["gyro", "frontleft", "frontright", "backleft", "backright", "properties", "visualizer"]
   const currentTabIndex = tabs.indexOf(activeTab)
   const isFirstTab = currentTabIndex === 0
   const isLastTab = currentTabIndex === tabs.length - 1
@@ -106,6 +108,16 @@ export default function Home() {
   }
 
   const handleDownload = async () => {
+    const errors = analyzeSwerve(config).findings.filter(f => f.severity === "error")
+    if (errors.length) {
+      setActiveTab("visualizer")
+      toast({
+        title: "Correct configuration errors before export",
+        description: errors[0].message,
+        variant: "destructive",
+      })
+      return
+    }
     try {
       await generateZip(config)
       router.push("/guide")
@@ -218,6 +230,9 @@ export default function Home() {
                 <TabsTrigger value="properties" className="whitespace-nowrap">
                   Properties
                 </TabsTrigger>
+                <TabsTrigger value="visualizer" className="whitespace-nowrap">
+                  3D & Checks
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -291,6 +306,10 @@ export default function Home() {
                   onChange={(updated) => setConfig({ ...config, pidfproperties: updated })}
                 />
               </div>
+            </TabsContent>
+
+            <TabsContent value="visualizer">
+              <SwerveVisualizer config={config} onEdit={setActiveTab} />
             </TabsContent>
 
             <div className="flex justify-between items-center gap-4 mt-6 pt-6 border-t border-border no-print">
