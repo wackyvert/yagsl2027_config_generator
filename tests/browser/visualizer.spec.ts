@@ -179,3 +179,67 @@ test("simulation drives, pauses, resets and supports keyboard steering", async (
     fullPage: true,
   })
 })
+
+test("slow rendering preserves drive speed and direction changes reuse the canvas", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const raf = window.requestAnimationFrame.bind(window)
+    const cancel = window.cancelAnimationFrame.bind(window)
+    let id = 0
+    const pending = new Map<number, { timer: number; frame?: number }>()
+    window.requestAnimationFrame = (callback) => {
+      const key = ++id
+      const entry = {
+        timer: window.setTimeout(() => {
+          entry.frame = raf((time) => {
+            pending.delete(key)
+            callback(time)
+          })
+        }, 125),
+        frame: undefined as number | undefined,
+      }
+      pending.set(key, entry)
+      return key
+    }
+    window.cancelAnimationFrame = (key) => {
+      const entry = pending.get(key)
+      if (entry) {
+        clearTimeout(entry.timer)
+        if (entry.frame) cancel(entry.frame)
+        pending.delete(key)
+      }
+    }
+  })
+  await page.goto("/")
+  await page.getByRole("tab", { name: "3D & Checks" }).click()
+  const canvas = await page.locator("canvas").elementHandle()
+  const pose = page.getByLabel("Simulated pose")
+  await expect(pose).toContainText("X 0.00 m")
+  await page
+    .getByRole("button", { name: "Drive simulation", exact: true })
+    .click()
+  await expect
+    .poll(async () => Number((await pose.innerText()).match(/X ([\d.-]+)/)![1]))
+    .toBeGreaterThan(0.1)
+  const sample = () =>
+    page.evaluate(() => ({
+      time: performance.now(),
+      x: Number(
+        document
+          .querySelector('[aria-label="Simulated pose"]')!
+          .textContent!.match(/X ([\d.-]+)/)![1],
+      ),
+    }))
+  const start = await sample()
+  await expect
+    .poll(async () => (await sample()).time - start.time)
+    .toBeGreaterThan(1200)
+  const end = await sample()
+  const speed = (end.x - start.x) / ((end.time - start.time) / 1000)
+  expect(speed).toBeGreaterThan(0.8)
+  expect(speed).toBeLessThan(1.2)
+  await page.getByRole("button", { name: "Strafe", exact: true }).click()
+  expect(await canvas!.evaluate((node) => node.isConnected)).toBe(true)
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
+})

@@ -130,6 +130,7 @@ export function SwerveVisualizer({
                 setPlaying(false)
                 return
               }
+              if (keys.current.has(key)) return
               keys.current.add(key)
               const k = keys.current
               setCommand([
@@ -140,7 +141,7 @@ export function SwerveVisualizer({
               setPlaying(true)
             }}
             onKeyUp={(e) => {
-              keys.current.delete(e.key.toLowerCase())
+              if (!keys.current.delete(e.key.toLowerCase())) return
               const k = keys.current
               setCommand([
                 (Number(k.has("w")) - Number(k.has("s"))) * 2,

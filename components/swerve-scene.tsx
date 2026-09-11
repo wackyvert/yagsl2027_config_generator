@@ -25,6 +25,14 @@ export default function SwerveScene({
   playing,
   resetPose,
 }: Props) {
+  const updateMotion = useRef<
+    ((motion: Props["motion"], playing: boolean) => void) | null
+  >(null)
+  const live = useRef({ motion, playing })
+  useEffect(() => {
+    live.current = { motion, playing }
+    updateMotion.current?.(motion, playing)
+  }, [motion, playing])
   const pose = useRef(origin())
   const poseReset = useRef(resetPose)
   const telemetry = useRef<HTMLOutputElement>(null)
@@ -64,7 +72,7 @@ export default function SwerveScene({
     scene.add(robot)
     robot.position.set(pose.current.x, 0, -pose.current.y)
     robot.rotation.y = pose.current.heading
-    const velocity = chassisVelocity(modules, motion.states)
+    let velocity = chassisVelocity(modules, live.current.motion.states)
     const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100)
     const span = Math.max(
       0.5,
@@ -131,9 +139,14 @@ export default function SwerveScene({
       sprite.position.set(x, y, z)
       robot.add(sprite)
     }
-    const rolling: { group: THREE.Group; rate: number }[] = []
+    const rolling: {
+      group: THREE.Group
+      steering: THREE.Group
+      arrow: THREE.ArrowHelper
+      rate: number
+    }[] = []
     modules.forEach((m, i) => {
-      const state = motion.states[i]
+      const state = live.current.motion.states[i]
       const group = new THREE.Group()
       group.position.set(m.x, m.diameter / 2, -m.y)
       group.rotation.y = state.angle
@@ -166,22 +179,27 @@ export default function SwerveScene({
         spoke.position.z = side * m.diameter * 0.24
         roll.add(spoke)
       }
-      rolling.push({ group: roll, rate: state.speed / (m.diameter / 2) })
+
       robot.add(group)
       const mount = box(0.07, 0.06, 0.07, colors[i])
       mount.position.set(m.x, 0.17, -m.y)
       robot.add(mount)
-      if (state.speed > 0.001)
-        robot.add(
-          new THREE.ArrowHelper(
-            new THREE.Vector3(Math.cos(state.angle), 0, -Math.sin(state.angle)),
-            new THREE.Vector3(m.x, 0.25, -m.y),
-            Math.min(span * 2, 0.12 + state.speed * 0.1),
-            colors[i],
-            0.07,
-            0.04,
-          ),
-        )
+      const arrow = new THREE.ArrowHelper(
+        new THREE.Vector3(Math.cos(state.angle), 0, -Math.sin(state.angle)),
+        new THREE.Vector3(m.x, 0.25, -m.y),
+        Math.min(span * 2, 0.12 + state.speed * 0.1),
+        colors[i],
+        0.07,
+        0.04,
+      )
+      arrow.visible = state.speed > 0.001
+      robot.add(arrow)
+      rolling.push({
+        group: roll,
+        steering: group,
+        arrow,
+        rate: state.speed / (m.diameter / 2),
+      })
       label(["FL", "FR", "BL", "BR"][i], m.x, 0.36, -m.y)
     })
     robot.add(
@@ -240,7 +258,7 @@ export default function SwerveScene({
     let frame = 0,
       previous = 0
     const animate = (time: number) => {
-      const dt = previous ? Math.min((time - previous) / 1000, 0.05) : 0
+      const dt = previous ? (time - previous) / 1000 : 0
       previous = time
       if (!document.hidden) {
         const old = robot.position.clone()
@@ -271,7 +289,38 @@ export default function SwerveScene({
       render()
       frame = requestAnimationFrame(animate)
     }
-    if (playing) frame = requestAnimationFrame(animate)
+    let running = false
+    const applyMotion = (next: Props["motion"], play: boolean) => {
+      velocity = chassisVelocity(modules, next.states)
+      rolling.forEach((wheel, i) => {
+        const state = next.states[i]
+        wheel.rate = state.speed / (modules[i].diameter / 2)
+        wheel.steering.rotation.y = state.angle
+        wheel.arrow.visible = state.speed > 0.001
+        wheel.arrow.setDirection(
+          new THREE.Vector3(Math.cos(state.angle), 0, -Math.sin(state.angle)),
+        )
+        wheel.arrow.setLength(
+          Math.min(span * 2, 0.12 + state.speed * 0.1),
+          0.07,
+          0.04,
+        )
+      })
+      if (play !== running) {
+        cancelAnimationFrame(frame)
+        previous = 0
+        running = play
+        if (play) frame = requestAnimationFrame(animate)
+      }
+      render()
+    }
+    // Hidden-tab time is deliberately excluded, without discarding slow visible frames.
+    const visibility = () => {
+      previous = 0
+    }
+    document.addEventListener("visibilitychange", visibility)
+    updateMotion.current = applyMotion
+    applyMotion(live.current.motion, live.current.playing)
     const lost = (event: Event) => {
       event.preventDefault()
       setError(true)
@@ -279,6 +328,8 @@ export default function SwerveScene({
     renderer.domElement.addEventListener("webglcontextlost", lost)
     return () => {
       cancelAnimationFrame(frame)
+      updateMotion.current = null
+      document.removeEventListener("visibilitychange", visibility)
       savedCamera.current = {
         key: cameraKey,
         position: camera.position.clone(),
@@ -306,7 +357,7 @@ export default function SwerveScene({
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [modules, motion, view, reset, playing, resetPose])
+  }, [modules, view, reset, resetPose])
   return (
     <div>
       <output
