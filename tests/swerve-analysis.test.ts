@@ -94,3 +94,29 @@ test("oversize wheels, excessive current and suspicious offsets are reviewable; 
   c.pidfproperties.angle.p = -1
   assert.equal(analyzeSwerve(c).valid, false)
 })
+
+test("forward kinematics recovers desaturated motion from asymmetric layout", async () => {
+  const { chassisVelocity, advancePose, origin } =
+    await import("../lib/swerve-simulation")
+  const c = fresh()
+  c.modules.frontleft.location.front = 17
+  const a = analyzeSwerve(c),
+    motion = moduleStates(a.modules, 4, 2, 5)
+  const v = chassisVelocity(a.modules, motion.states)
+  near(v.vx, 4 * motion.scale)
+  near(v.vy, 2 * motion.scale)
+  near(v.omega, 5 * motion.scale)
+  const straight = advancePose(origin(), { vx: 2, vy: 1, omega: 0 }, 2)
+  near(straight.x, 4)
+  near(straight.y, 2)
+  const circle = advancePose(origin(), { vx: 1, vy: 0, omega: 1 }, Math.PI * 2)
+  near(circle.x, 0)
+  near(circle.y, 0)
+  const rotated = advancePose(
+    { x: 0, y: 0, heading: Math.PI / 2 },
+    { vx: 1, vy: 0, omega: 0 },
+    1,
+  )
+  near(rotated.x, 0)
+  near(rotated.y, 1)
+})

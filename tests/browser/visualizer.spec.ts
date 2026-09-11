@@ -75,13 +75,11 @@ test("uploaded module overrides and unknown motor assumptions stay out of export
   )
   zip.file("modules/pidfproperties.json", JSON.stringify(config.pidfproperties))
   await page.goto("/")
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "swerve.zip",
-      mimeType: "application/zip",
-      buffer: await zip.generateAsync({ type: "nodebuffer" }),
-    })
+  await page.locator("input[type=file]").setInputFiles({
+    name: "swerve.zip",
+    mimeType: "application/zip",
+    buffer: await zip.generateAsync({ type: "nodebuffer" }),
+  })
   await expect(
     page.getByText("Configuration loaded successfully", { exact: true }),
   ).toBeVisible()
@@ -95,10 +93,10 @@ test("uploaded module overrides and unknown motor assumptions stay out of export
   await page.getByRole("spinbutton", { name: /frontleft.*RPM/ }).fill("5676")
   await expect(page.getByText("2.24 m/s", { exact: true })).toHaveCount(2)
   await page
-    .getByRole("button", { name: "Animate wheels", exact: true })
+    .getByRole("button", { name: "Drive simulation", exact: true })
     .click()
   await expect(
-    page.getByRole("button", { name: "Pause wheels", exact: true }),
+    page.getByRole("button", { name: "Pause simulation", exact: true }),
   ).toBeVisible()
   const pending = page.waitForEvent("download")
   await page
@@ -137,4 +135,47 @@ test("WebGL failure preserves the accessible state table", async ({ page }) => {
   await expect(
     page.getByRole("cell", { name: "135.00 °", exact: true }),
   ).toBeVisible()
+})
+
+test("simulation drives, pauses, resets and supports keyboard steering", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await page.getByRole("tab", { name: "3D & Checks" }).click()
+  const pose = page.getByLabel("Simulated pose")
+  await expect(pose).toContainText("X 0.00 m")
+  await page
+    .getByRole("button", { name: "Drive simulation", exact: true })
+    .click()
+  await expect
+    .poll(async () => Number((await pose.innerText()).match(/X ([\d.-]+)/)![1]))
+    .toBeGreaterThan(0.15)
+  await page
+    .getByRole("button", { name: "Pause simulation", exact: true })
+    .click()
+  const paused = await pose.innerText()
+  await page.getByRole("button", { name: "Top view", exact: true }).click()
+  await expect(pose).toHaveText(paused)
+  await page
+    .getByRole("button", { name: "Reset position", exact: true })
+    .click()
+  await expect(pose).toContainText("X 0.00 m · Y 0.00 m · Heading 0.0°")
+  await page
+    .getByRole("group", { name: "Keyboard driving", exact: true })
+    .focus()
+  await page.keyboard.down("q")
+  await expect
+    .poll(async () =>
+      Number((await pose.innerText()).match(/Heading ([\d.-]+)/)![1]),
+    )
+    .toBeGreaterThan(5)
+  await page.keyboard.up("q")
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
+  await expect(
+    page.getByRole("button", { name: "Drive simulation", exact: true }),
+  ).toBeVisible()
+  await page.screenshot({
+    path: "test-results/driving-simulation.png",
+    fullPage: true,
+  })
 })

@@ -51,7 +51,7 @@ Deployment is automatic on push to `main` via `.github/workflows/nextjs.yml` —
 
 ## Drivebase lab
 
-The final **3D & Checks** tab reads the same configuration used by the forms and ZIP export. Orbit/zoom the Three.js scene, switch to top view, animate the wheels, or try forward, strafe, spin and combined commands. Module centers and wheel diameters are dimensionally accurate; deck/mount geometry is illustrative. The accessible state table remains available when WebGL is unavailable.
+The final **3D & Checks** tab reads the same configuration used by the forms and ZIP export. Orbit/zoom the Three.js scene, switch to top view, drive the chassis across a practice grid, or try forward, strafe, spin and combined commands. Module centers and wheel diameters are dimensionally accurate; deck/mount geometry is illustrative. The accessible state table remains available when WebGL is unavailable.
 
 The calculator uses inches for configuration geometry and SI units for motion. Per-module gearing takes precedence over shared gearing. Ideal free speed is `RPM / 60 / reduction * π * diameter`; pure translation is limited by the slowest wheel and pure rotation by the minimum `wheel speed / module radius`. Combined robot-relative commands use `(vx - ωy, vy + ωx)` and uniform wheel-speed desaturation. +X is forward, +Y is left, and positive rotation is counterclockwise from above. See [WPILib kinematics](https://docs.wpilib.org/en/stable/docs/software/kinematics-and-odometry/swerve-drive-kinematics.html).
 
@@ -68,5 +68,7 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 pnpm build
 ```
+
+The driving simulation recovers chassis velocity from the desaturated module vectors with least-squares forward kinematics, including asymmetric layouts, then integrates the robot-relative twist into field position and heading. The camera follows the robot over an unbounded 0.5 m practice grid with a bounded path trail. Drive/pause, reset position, and a focusable W/A/S/D + Q/E keyboard pad control motion. Releasing keys stops keyboard commands; leaving the pad pauses. Invalid configurations or unknown wheel limits disable driving. Motion is ideal no-slip kinematics, without acceleration, obstacles or collision physics.
 
 Browser tests exercise the live form, 3D canvas, commands, invalid export guard, mobile layout and successful ZIP download. Screenshots are written to ignored `test-results/`.

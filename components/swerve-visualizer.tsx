@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,8 @@ export function SwerveVisualizer({
   const [command, setCommand] = useState([1, 0, 0])
   const [view, setView] = useState<"perspective" | "top">("perspective")
   const [playing, setPlaying] = useState(false)
+  const keys = useRef(new Set<string>())
+  const [resetPose, setResetPose] = useState(0)
   const [reset, setReset] = useState(0)
   const [mu, setMu] = useState(1)
   const analysis = useMemo(() => analyzeSwerve(config, rpm), [config, rpm])
@@ -69,17 +71,32 @@ export function SwerveVisualizer({
             <Button variant="outline" onClick={() => setReset(reset + 1)}>
               Reset camera
             </Button>
-            <Button variant="outline" onClick={() => setPlaying(!playing)}>
-              {playing ? "Pause wheels" : "Animate wheels"}
+            <Button
+              variant="outline"
+              disabled={!analysis.valid || !motion.known}
+              onClick={() => setPlaying(!playing)}
+            >
+              {playing ? "Pause simulation" : "Drive simulation"}
             </Button>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setPlaying(false)
+              setCommand([0, 0, 0])
+              setResetPose(resetPose + 1)
+            }}
+          >
+            Reset position
+          </Button>
           {renderable ? (
             <Scene
               modules={analysis.modules}
               motion={motion}
               view={view}
               reset={reset}
-              playing={playing}
+              playing={playing && analysis.valid && motion.known}
+              resetPose={resetPose}
             />
           ) : (
             <div className="rounded-lg border p-10">
@@ -89,14 +106,58 @@ export function SwerveVisualizer({
           )}
           <p className="text-sm text-muted-foreground">
             Drag to orbit · Scroll to zoom. +X forward, +Y left, positive
-            rotation counterclockwise viewed from above. Wheel animation shows
-            commanded rolling speed; chassis stays centered. Deck and mounts are
-            illustrative; wheel diameter and module centers use your
-            configuration.
+            rotation counterclockwise viewed from above. The camera follows the
+            driving chassis; the blue trail records its path on a 0.5 m grid. An
+            unbounded practice plane models ideal no-slip motion from the
+            configured wheel states. Deck and mounts are illustrative; wheel
+            diameter and module centers use your configuration.
           </p>
         </div>
         <div className="space-y-5">
           <h3 className="font-semibold">Robot-relative command</h3>
+          <div
+            role="group"
+            aria-label="Keyboard driving"
+            tabIndex={0}
+            className="rounded border p-3 text-sm focus-visible:outline-2 focus-visible:outline-blue-600"
+            onKeyDown={(e) => {
+              const key = e.key.toLowerCase()
+              if (!["w", "a", "s", "d", "q", "e", " "].includes(key)) return
+              e.preventDefault()
+              if (key === " ") {
+                keys.current.clear()
+                setCommand([0, 0, 0])
+                setPlaying(false)
+                return
+              }
+              keys.current.add(key)
+              const k = keys.current
+              setCommand([
+                (Number(k.has("w")) - Number(k.has("s"))) * 2,
+                (Number(k.has("a")) - Number(k.has("d"))) * 2,
+                (Number(k.has("q")) - Number(k.has("e"))) * 2,
+              ])
+              setPlaying(true)
+            }}
+            onKeyUp={(e) => {
+              keys.current.delete(e.key.toLowerCase())
+              const k = keys.current
+              setCommand([
+                (Number(k.has("w")) - Number(k.has("s"))) * 2,
+                (Number(k.has("a")) - Number(k.has("d"))) * 2,
+                (Number(k.has("q")) - Number(k.has("e"))) * 2,
+              ])
+            }}
+            onBlur={() => {
+              keys.current.clear()
+              setCommand([0, 0, 0])
+              setPlaying(false)
+            }}
+          >
+            Click here to drive: W/S forward/back, A/D strafe, Q/E rotate.
+            Release to stop; Space pauses. Or use the sliders and Drive
+            simulation below.
+          </div>
           {["Forward (m/s)", "Left (m/s)", "Rotation (rad/s)"].map(
             (label, i) => (
               <label key={label} className="block text-sm">
@@ -131,7 +192,10 @@ export function SwerveVisualizer({
                 key={String(name)}
                 variant="outline"
                 size="sm"
-                onClick={() => setCommand(values as number[])}
+                onClick={() => {
+                  setCommand(values as number[])
+                  if (name === "Stop") setPlaying(false)
+                }}
               >
                 {name as string}
               </Button>
