@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useRef } from "react"
 import dynamic from "next/dynamic"
+import { SwerveStudentLab } from "./swerve-student-lab"
+import { previewReduction } from "@/lib/swerve-simulation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -35,7 +37,15 @@ export function SwerveVisualizer({
   const [resetPose, setResetPose] = useState(0)
   const [reset, setReset] = useState(0)
   const [mu, setMu] = useState(1)
-  const analysis = useMemo(() => analyzeSwerve(config, rpm), [config, rpm])
+  const [reduction, setReduction] = useState(1)
+  const analysis = useMemo(
+    () =>
+      analyzeSwerve(
+        reduction === 1 ? config : previewReduction(config, reduction),
+        rpm,
+      ),
+    [config, rpm, reduction],
+  )
   const motion = useMemo(
     () =>
       moduleStates(analysis.modules, ...(command as [number, number, number])),
@@ -104,6 +114,11 @@ export function SwerveVisualizer({
               Locations use inches, not millimeters.
             </div>
           )}
+          {reduction !== 1 && (
+            <p className="text-sm font-medium">
+              Preview reduction: {reduction.toFixed(2)}× configured gearing
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             Drag to orbit · Scroll to zoom. +X forward, +Y left, positive
             rotation counterclockwise viewed from above. The camera follows the
@@ -157,7 +172,7 @@ export function SwerveVisualizer({
           >
             Click here to drive: W/S forward/back, A/D strafe, Q/E rotate.
             Release to stop; Space pauses. Or use the sliders and Drive
-            simulation below.
+            simulation button above.
           </div>
           {["Forward (m/s)", "Left (m/s)", "Rotation (rad/s)"].map(
             (label, i) => (
@@ -250,6 +265,32 @@ export function SwerveVisualizer({
           </p>
         </div>
       </div>
+      {reduction !== 1 && (
+        <p
+          role="status"
+          className="rounded border border-amber-500 p-3 text-sm"
+        >
+          Preview gearing experiment active: {reduction.toFixed(2)}× reduction.
+          Limits and motion below use the experiment; Download Config uses your
+          original settings.
+        </p>
+      )}
+      <SwerveStudentLab
+        analysis={analysis}
+        motion={motion}
+        command={command}
+        reduction={reduction}
+        onReduction={(value) => {
+          setPlaying(false)
+          setReduction(value)
+        }}
+        onExperiment={(values) => {
+          keys.current.clear()
+          setPlaying(false)
+          setCommand(values)
+          setResetPose(resetPose + 1)
+        }}
+      />
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <caption className="mb-2 text-left font-semibold">

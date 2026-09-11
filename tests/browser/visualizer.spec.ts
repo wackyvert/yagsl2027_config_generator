@@ -243,3 +243,53 @@ test("slow rendering preserves drive speed and direction changes reuse the canva
   expect(await canvas!.evaluate((node) => node.isConnected)).toBe(true)
   await page.getByRole("button", { name: "Stop", exact: true }).click()
 })
+
+test("student experiments reveal explanations and keep gearing changes out of export", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await page.getByRole("tab", { name: "3D & Checks" }).click()
+  await page.getByLabel("Choose an experiment").selectOption("2")
+  await page
+    .getByRole("button", { name: "Load experiment", exact: true })
+    .click()
+  await expect(
+    page.getByRole("slider", { name: /Forward \(m\/s\)/ }),
+  ).toHaveValue("5")
+  await page
+    .getByRole("button", { name: "Reveal explanation", exact: true })
+    .click()
+  await expect(
+    page.getByRole("button", { name: "Hide explanation", exact: true }),
+  ).toBeVisible()
+  await page.getByLabel("Inspect a module").selectOption("1")
+  await expect(
+    page.getByRole("region", { name: "Wheel vector inspector" }),
+  ).toContainText("−ωy, +ωx")
+  await page
+    .getByRole("slider", { name: /Preview drive reduction multiplier/ })
+    .fill("2")
+  await expect(
+    page.getByText("Preview reduction: 2.00× configured gearing", {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(
+    page.locator("dl > div").filter({ hasText: "Pure translation" }),
+  ).toContainText("2.24 m/s")
+  await page.getByRole("button",{name:"Stop",exact:true}).click()
+  await page.getByRole("slider",{name:/Forward \(m\/s\)/}).fill("-1")
+  await expect(page.getByText(/Shortest equivalent target:/)).toContainText("signed drive speed: -1.00 m/s")
+  const download = page.waitForEvent("download")
+  await page
+    .getByRole("button", { name: "Download Config", exact: true })
+    .click()
+  const file = await (await download).path()
+  const { default: JSZip } = await import("jszip")
+  const fs = await import("node:fs/promises")
+  const zip = await JSZip.loadAsync(await fs.readFile(file!))
+  const physical = JSON.parse(
+    await zip.file("modules/physicalproperties.json")!.async("text"),
+  )
+  expect(physical.gearing.drive.gearRatio).toBe(6.75)
+})

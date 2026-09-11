@@ -53,3 +53,30 @@ export function advancePose(
     ),
   }
 }
+
+/** Build a preview without mutating the config or changing its export. */
+export function previewReduction(
+  config: import("./types").ConfigData,
+  multiplier: number,
+) {
+  const preview = structuredClone(config)
+  for (const module of Object.values(preview.modules)) {
+    const gearing = structuredClone(
+      module.gearing ?? preview.physicalproperties.gearing,
+    )
+    gearing.drive.gearRatio *= multiplier
+    module.gearing = gearing
+  }
+  return preview
+}
+
+/** Choose equivalent wheel motion requiring at most 90 degrees of steering. */
+export function optimizeWheel(angle: number, speed: number, current: number) {
+  let delta = Math.atan2(Math.sin(angle - current), Math.cos(angle - current))
+  let driveSpeed = speed
+  if (Math.abs(delta) > Math.PI / 2) {
+    delta -= Math.sign(delta) * Math.PI
+    driveSpeed = -speed
+  }
+  return { angle: current + delta, delta, speed: driveSpeed }
+}

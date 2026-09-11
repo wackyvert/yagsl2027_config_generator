@@ -120,3 +120,33 @@ test("forward kinematics recovers desaturated motion from asymmetric layout", as
   near(rotated.x, 0)
   near(rotated.y, 1)
 })
+
+test("student reduction experiment honors overrides without changing export source", async () => {
+  const { previewReduction } = await import("../lib/swerve-simulation")
+  const c = fresh()
+  c.modules.frontleft.gearing = {
+    drive: { gearRatio: 9, diameter: 4 },
+    angle: { gearRatio: 12.8 },
+  }
+  const before = JSON.stringify(c)
+  const preview = previewReduction(c, 2)
+  near(preview.modules.frontleft.gearing!.drive.gearRatio, 18)
+  near(preview.modules.frontright.gearing!.drive.gearRatio, 13.5)
+  near(analyzeSwerve(preview).maxSpeed!, analyzeSwerve(c).maxSpeed! / 2)
+  assert.equal(JSON.stringify(c), before)
+})
+
+test("steering optimization preserves wheel vector through reversal and wrap", async () => {
+  const { optimizeWheel } = await import("../lib/swerve-simulation")
+  for (const [angle, current] of [
+    [Math.PI, 0],
+    [(-179 * Math.PI) / 180, (179 * Math.PI) / 180],
+    [0, 10 * Math.PI],
+  ]) {
+    const optimized = optimizeWheel(angle, 2, current)
+    assert.ok(Math.abs(optimized.delta) <= Math.PI / 2)
+    near(Math.cos(optimized.angle) * optimized.speed, Math.cos(angle) * 2)
+    near(Math.sin(optimized.angle) * optimized.speed, Math.sin(angle) * 2)
+  }
+  near(optimizeWheel(Math.PI, 2, 0).speed, -2)
+})

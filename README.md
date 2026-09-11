@@ -72,3 +72,9 @@ pnpm build
 The driving simulation recovers chassis velocity from the desaturated module vectors with least-squares forward kinematics, including asymmetric layouts, then integrates the robot-relative twist into field position and heading. The camera follows the robot over an unbounded 0.5 m practice grid with a bounded path trail. Drive/pause, reset position, and a focusable W/A/S/D + Q/E keyboard pad control motion. Releasing keys stops keyboard commands; leaving the pad pauses. Invalid configurations or unknown wheel limits disable driving. Motion is ideal no-slip kinematics, without acceleration, obstacles or collision physics.
 
 Browser tests exercise the live form, 3D canvas, commands, invalid export guard, mobile layout and successful ZIP download. Screenshots are written to ignored `test-results/`.
+
+### Student workshop
+
+The 3D tab includes four prediction-and-explanation experiments covering translation axes, tangential wheel motion, desaturation and gearing tradeoffs. Load an experiment to reset the pose and pause before driving. A per-module vector inspector shows translation plus rotational velocity, steering angle and the shared limiting factor using live values.
+
+The preview reduction slider scales every module's effective drive reduction (including overrides) without modifying configuration state or ZIP exports. A visible experiment indicator distinguishes its limits from configured limits; Restore configured gearing returns to the original model. Wheel torque comparisons assume equal motor torque and ideal gearing, not a prediction of real acceleration or thermal behavior.
